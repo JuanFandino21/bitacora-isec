@@ -5,52 +5,51 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: isecdb
-      POSTGRES_USER: isecuser
-      POSTGRES_PASSWORD: isecpass
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: bitacora
     volumes:
       - pgdata:/var/lib/postgresql/data
-    networks: [appnet]
+    ports:
+      - "5432:5432"
 
   redis:
     image: redis:7-alpine
-    volumes:
-      - rediskv:/data
-    networks: [appnet]
+    ports:
+      - "6379:6379"
 
   backend:
-    image: juanfahz/bitacora-backend:1.0.0
     build: ./backend
+    # o si ya la subiste a Docker Hub:
+    # image: juanfahz/bitacora-backend:1.0.0
+    depends_on:
+      - db
+      - redis
     environment:
-      POSTGRES_HOST: db
-      POSTGRES_DB: isecdb
-      POSTGRES_USER: isecuser
-      POSTGRES_PASSWORD: isecpass
-      REDIS_HOST: redis
-    depends_on: [db, redis]
-    ports: ["8000:8000"]
-    networks: [appnet]
-
-  worker:
-    image: juanfahz/bitacora-worker:1.0.0
-    build: ./worker
-    environment:
-      POSTGRES_HOST: db
-      POSTGRES_DB: isecdb
-      POSTGRES_USER: isecuser
-      POSTGRES_PASSWORD: isecpass
-      REDIS_HOST: redis
-    depends_on: [db, redis]
-    networks: [appnet]
+      - DATABASE_URL=postgresql://app:app@db:5432/bitacora
+      - REDIS_URL=redis://redis:6379/0
+      - FLASK_ENV=production
+    ports:
+      - "8000:8000"
 
   web:
-    image: juanfahz/bitacora-web:1.0.0
     build: ./web
+    depends_on:
+    - backend
     environment:
-      API_URL: "http://backend:8000/api"
-    depends_on: [backend]
-    ports: ["3000:3000"]
-    networks: [appnet]
+    - BACKEND_URL=http://backend:8000
+    ports:
+    - "3000:3000"
+
+  worker:
+    build: ./worker
+    # o: image: juanfahz/bitacora-worker:1.0.0
+    depends_on:
+      - backend
+      - redis
+    environment:
+      - DATABASE_URL=postgresql://app:app@db:5432/bitacora
+      - REDIS_URL=redis://redis:6379/0
 
 volumes:
   pgdata:
