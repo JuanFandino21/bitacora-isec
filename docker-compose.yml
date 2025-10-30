@@ -1,0 +1,61 @@
+version: "3.9"
+name: bitacora-isec
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: isecdb
+      POSTGRES_USER: isecuser
+      POSTGRES_PASSWORD: isecpass
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [appnet]
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - rediskv:/data
+    networks: [appnet]
+
+  backend:
+    image: juanfahz/bitacora-backend:1.0.0
+    build: ./backend
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: isecdb
+      POSTGRES_USER: isecuser
+      POSTGRES_PASSWORD: isecpass
+      REDIS_HOST: redis
+    depends_on: [db, redis]
+    ports: ["8000:8000"]
+    networks: [appnet]
+
+  worker:
+    image: juanfahz/bitacora-worker:1.0.0
+    build: ./worker
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: isecdb
+      POSTGRES_USER: isecuser
+      POSTGRES_PASSWORD: isecpass
+      REDIS_HOST: redis
+    depends_on: [db, redis]
+    networks: [appnet]
+
+  web:
+    image: juanfahz/bitacora-web:1.0.0
+    build: ./web
+    environment:
+      API_URL: "http://backend:8000/api"
+    depends_on: [backend]
+    ports: ["3000:3000"]
+    networks: [appnet]
+
+volumes:
+  pgdata:
+  rediskv:
+
+networks:
+  appnet:
+    driver: bridge
