@@ -27,8 +27,3 @@ db (PostgreSQL): persistencia.
 redis (Redis): caché y cola.
 compose (Docker Compose): define servicios, enlaces por nombre, volúmenes, puertos y red appnet.
 
-Diagrama simple:
-
-web ──> backend ──> db
-  │         │
-  └────────> redis <── worker# bitacora-isec
