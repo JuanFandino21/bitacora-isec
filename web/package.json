@@ -1,10 +1,14 @@
 {
-  "name": "bitacora-isec-web",
+  "name": "bitacora-web",
   "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "express": "^4.19.2",
-    "node-fetch": "^3.3.2"
+  "description": "Bitácora ISec Frontend",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
   },
-  "scripts": { "start": "node server.js" }
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "http-proxy-middleware": "^2.0.9"
+  }
 }

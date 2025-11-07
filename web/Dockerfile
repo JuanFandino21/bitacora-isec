@@ -1,8 +1,11 @@
 FROM node:20-alpine
+
 WORKDIR /app
-COPY package.json .
-RUN npm install --only=production
-COPY server.js .
-ENV API_URL=http://backend:8000/api
+
+COPY package.json package-lock.json* ./
+RUN npm install --production
+
+COPY . .
+
 EXPOSE 3000
-CMD ["npm","start"]
+CMD ["node", "server.js"]

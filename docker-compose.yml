@@ -1,60 +1,92 @@
-version: "3.9"
-name: bitacora-isec
+version: '3.8'
 
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16
+    container_name: bitacora-isec-db
     environment:
-      POSTGRES_USER: app
-      POSTGRES_PASSWORD: app
-      POSTGRES_DB: bitacora
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      POSTGRES_DB: bitacora_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - bitacora-isec
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   redis:
     image: redis:7-alpine
+    container_name: bitacora-isec-redis
     ports:
       - "6379:6379"
+    networks:
+      - bitacora-isec
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   backend:
-    build: ./backend
-    # o si ya la subiste a Docker Hub:
-    # image: juanfahz/bitacora-backend:1.0.0
+    build:
+      context: ./backend
+    container_name: bitacora-isec-backend
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://app:app@db:5432/bitacora
-      - REDIS_URL=redis://redis:6379/0
-      - FLASK_ENV=production
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/bitacora_db
+      REDIS_URL: redis://redis:6379/0
     ports:
-      - "8000:8000"
-
-  web:
-    build: ./web
-    depends_on:
-    - backend
-    environment:
-    - BACKEND_URL=http://backend:8000
-    ports:
-    - "3000:3000"
+      - "5000:5000"
+    volumes:
+      - ./backend:/app
+    networks:
+      - bitacora-isec
+    command: python app.py
 
   worker:
-    build: ./worker
-    # o: image: juanfahz/bitacora-worker:1.0.0
+    build:
+      context: ./backend
+    container_name: bitacora-isec-worker
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/bitacora_db
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    networks:
+      - bitacora-isec
+    command: celery -A worker worker --loglevel=info
+
+  web:
+    build:
+      context: ./web
+    container_name: bitacora-isec-web
     depends_on:
       - backend
-      - redis
-    environment:
-      - DATABASE_URL=postgresql://app:app@db:5432/bitacora
-      - REDIS_URL=redis://redis:6379/0
-
-volumes:
-  pgdata:
-  rediskv:
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/app
+    networks:
+      - bitacora-isec
 
 networks:
-  appnet:
+  bitacora-isec:
     driver: bridge
+
+volumes:
+  postgres_data:

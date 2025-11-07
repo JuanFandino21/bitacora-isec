@@ -1,30 +1,61 @@
-import os, psycopg2, redis, time
+import psycopg2
+from psycopg2 import OperationalError
+import time
+import os
 
-DB = dict(host=os.getenv("POSTGRES_HOST","db"),
-          dbname=os.getenv("POSTGRES_DB","isecdb"),
-          user=os.getenv("POSTGRES_USER","isecuser"),
-          password=os.getenv("POSTGRES_PASSWORD","isecpass"))
-R = redis.Redis(host=os.getenv("REDIS_HOST","redis"), port=6379, db=0)
+# Configuración de la base de datos
+DB_CONFIG = {
+    'dbname': os.getenv('POSTGRES_DB', 'bitacora_db'),
+    'user': os.getenv('POSTGRES_USER', 'postgres'),
+    'password': os.getenv('POSTGRES_PASSWORD', 'postgres'),
+    'host': os.getenv('DB_HOST', 'db'),
+    'port': os.getenv('DB_PORT', '5432')
+}
 
-def conn(): return psycopg2.connect(**DB)
+def get_db_connection(max_retries=5, retry_delay=2):
+    """
+    Intenta conectarse a la base de datos con reintentos
+    """
+    for attempt in range(max_retries):
+        try:
+            conn = psycopg2.connect(**DB_CONFIG)
+            print(f"✓ Worker conectado a PostgreSQL (intento {attempt + 1})")
+            return conn
+        except OperationalError as e:
+            if attempt == max_retries - 1:
+                print(f"✗ Worker: No se pudo conectar después de {max_retries} intentos")
+                raise
+            print(f"⚠ Worker intento {attempt + 1} fallido. Reintentando en {retry_delay}s...")
+            time.sleep(retry_delay)
 
-def regla_severidad(texto:str)->str:
-    t = texto.lower()
-    if any(w in t for w in ["credencial","expuesto","público","publico","root sin","comprometido","vulnerabilidad"]): return "alta"
-    if any(w in t for w in ["sin cifrar","default","antiguo","obsoleto","permiso amplio","warning"]): return "media"
-    return "baja"
+def main():
+    """
+    Función principal del worker
+    """
+    print("Iniciando worker de Bitácora ISEC...")
+    
+    # Conectar a la base de datos
+    conn = get_db_connection()
+    
+    try:
+        # Aquí puedes agregar la lógica de tu worker
+        # Por ejemplo, procesar tareas en segundo plano
+        print("✓ Worker iniciado correctamente")
+        
+        # Mantener el worker ejecutándose
+        while True:
+            # Tu lógica de procesamiento aquí
+            time.sleep(10)
+            
+    except KeyboardInterrupt:
+        print("\n✓ Worker detenido por el usuario")
+    except Exception as e:
+        print(f"✗ Error en worker: {e}")
+    finally:
+        if conn:
+            conn.close()
+            print("✓ Conexión cerrada")
 
-if __name__=="__main__":
-    print("Worker Bitácora ISec 👷 listo")
-    while True:
-        item = R.brpop("cola:clasificar")
-        rid = int(item[1])
-        with conn() as c, c.cursor() as cur:
-            cur.execute("SELECT descripcion FROM registros WHERE id=%s;", (rid,))
-            row = cur.fetchone()
-            if not row: continue
-            sev = regla_severidad(row[0])
-            cur.execute("UPDATE registros SET severidad=%s WHERE id=%s;", (sev, rid))
-        R.delete("cache:registros")
-        print(f"[worker] Registro {rid} => severidad {sev}")
-        time.sleep(0.2)
+if __name__ == '__main__':
+    main()
+

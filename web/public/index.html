@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitácora ISec</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; margin-bottom: 30px; text-align: center; }
+        .status { background: #d4edda; color: #155724; padding: 15px; border-radius: 5px; margin-bottom: 20px; text-align: center; font-weight: bold; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
+        input, textarea, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        textarea { min-height: 100px; resize: vertical; }
+        button { background: #007bff; color: white; padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+        th { background: #007bff; color: white; padding: 12px; text-align: left; }
+        td { padding: 12px; border-bottom: 1px solid #ddd; }
+        tr:hover { background: #f9f9f9; }
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bitácora ISec</h1>
+        <div class="status" id="status">Cargando...</div>
+
+        <form id="registroForm">
+            <div class="form-group">
+                <label>Título:</label>
+                <input type="text" name="titulo" required>
+            </div>
+            <div class="form-group">
+                <label>Descripción:</label>
+                <textarea name="descripcion" required></textarea>
+            </div>
+            <div class="form-group">
+                <label>Tipo:</label>
+                <select name="tipo" required>
+                    <option value="prueba_red">Prueba Red</option>
+                    <option value="docker">Docker</option>
+                    <option value="k8s">K8s</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Severidad:</label>
+                <select name="severidad" required>
+                    <option value="Baja">Baja</option>
+                    <option value="Media">Media</option>
+                    <option value="Alta">Alta</option>
+                    <option value="Crítica">Crítica</option>
+                </select>
+            </div>
+            <button type="submit">Guardar</button>
+        </form>
+
+        <h2 style="margin-top: 40px; margin-bottom: 20px;">Registros</h2>
+        <table id="registrosTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Título</th>
+                    <th>Tipo</th>
+                    <th>Severidad</th>
+                    <th>Descripción</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script>
+        const API_URL = '/api';
+
+        async function checkStatus() {
+            try {
+                const res = await fetch(API_URL + '/registros');
+                if (res.ok) {
+                    document.getElementById('status').innerHTML = '✓ Conectado';
+                    document.getElementById('status').style.background = '#d4edda';
+                    loadRegistros();
+                }
+            } catch (e) {
+                document.getElementById('status').innerHTML = '✗ No conectado';
+                document.getElementById('status').style.background = '#f8d7da';
+            }
+        }
+
+        async function loadRegistros() {
+            try {
+                const res = await fetch(API_URL + '/registros');
+                const data = await res.json();
+                const tbody = document.querySelector('#registrosTable tbody');
+                tbody.innerHTML = data.map(r => `
+                    <tr>
+                        <td>${r.id}</td>
+                        <td>${r.titulo}</td>
+                        <td>${r.tipo}</td>
+                        <td><strong>${r.severidad}</strong></td>
+                        <td>${r.descripcion.substring(0, 50)}...</td>
+                        <td>${new Date(r.fecha_creacion).toLocaleString()}</td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error('Error:', e);
+            }
+        }
+
+        document.getElementById('registroForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                titulo: form.titulo.value,
+                descripcion: form.descripcion.value,
+                tipo: form.tipo.value,
+                severidad: form.severidad.value
+            };
+            
+            try {
+                const res = await fetch(API_URL + '/registros', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const responseData = await res.json();
+                if (res.ok) {
+                    form.reset();
+                    loadRegistros();
+                    alert('✓ Registro guardado');
+                } else {
+                    alert('✗ Error: ' + (responseData.error || 'Error desconocido'));
+                    console.error('Respuesta del servidor:', responseData);
+                }
+            } catch (e) {
+                alert('✗ Error: ' + e.message);
+                console.error('Error de red:', e);
+            }
+        });
+
+        checkStatus();
+        setInterval(checkStatus, 5000);
+        setInterval(loadRegistros, 3000);
+    </script>
+</body>
+</html>
