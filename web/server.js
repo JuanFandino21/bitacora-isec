@@ -19,6 +19,6 @@ app.use('/api', createProxyMiddleware({
 }));
 
 app.listen(3000, () => {
-    console.log('✅ Web server running on port 3000');
-    console.log('📡 Backend proxy at http://backend:5000');
+    console.log(' Web server running on port 3000');
+    console.log(' Backend proxy at http://backend:5000');
 });
